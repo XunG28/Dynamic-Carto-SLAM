@@ -1,0 +1,10 @@
+# ros2 bag record --qos-profile-overrides-path
+
+/tracked_pose:
+  reliability: best_effort
+  history: keep_last
+  depth: 100
+/scan:
+  reliability: best_effort
+  history: keep_last
+  depth: 10
