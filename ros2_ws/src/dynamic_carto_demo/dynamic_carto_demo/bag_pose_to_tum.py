@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Copyright 2026
 # SPDX-License-Identifier: Apache-2.0
-"""from rosbag2 to TUM"""
+"""Export a pose topic from rosbag2 to TUM format."""
 from __future__ import annotations
 
 import argparse
@@ -15,10 +15,13 @@ from rosbag2_py import ConverterOptions, SequentialReader, StorageOptions
 
 def main() -> None:
     p = argparse.ArgumentParser(
-        description='Export PoseStamped topic from a rosbag2 folder to TUM (timestamp tx ty tz qx qy qz qw).'
+        description=(
+            'Export PoseStamped or Odometry topic from a rosbag2 folder to TUM '
+            '(timestamp tx ty tz qx qy qz qw).'
+        )
     )
     p.add_argument('bag_dir', type=Path, help='rosbag2 file（ *.db3）')
-    p.add_argument('topic', type=str, help=' /tracked_pose or /eval/ground_truth/pose')
+    p.add_argument('topic', type=str, help='e.g. /tracked_pose, /eval/ground_truth/pose, /kiss/odometry, /odometry/filtered')
     p.add_argument('-o', '--output', type=Path, required=True, help='output .tum file')
     args = p.parse_args()
 
@@ -44,8 +47,20 @@ def main() -> None:
             continue
         msg = deserialize_message(data, msg_cls)
         ts = float(msg.header.stamp.sec) + float(msg.header.stamp.nanosec) * 1e-9
-        pos = msg.pose.position
-        q = msg.pose.orientation
+
+        # Support both geometry_msgs/PoseStamped and nav_msgs/Odometry.
+        if hasattr(msg, 'pose') and hasattr(msg.pose, 'position'):
+            # PoseStamped
+            pos = msg.pose.position
+            q = msg.pose.orientation
+        elif hasattr(msg, 'pose') and hasattr(msg.pose, 'pose'):
+            # Odometry
+            pos = msg.pose.pose.position
+            q = msg.pose.pose.orientation
+        else:
+            print(f'error: unsupported message type for topic {args.topic}: {type_map[args.topic]}', file=sys.stderr)
+            sys.exit(2)
+
         rows.append((ts, pos.x, pos.y, pos.z, q.x, q.y, q.z, q.w))
 
     rows.sort(key=lambda r: r[0])

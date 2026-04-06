@@ -1,0 +1,17 @@
+# KISS-ICP for TB3 2D LDS + offline bag (sim time).
+# base_footprint + odom: pose is expressed in odom -> base_footprint (matches EKF / Cartographer).
+# LaserScan->PointCloud2 has no per-point timestamps; deskew off.
+
+kiss_icp_node:
+  ros__parameters:
+    base_frame: "base_footprint"
+    lidar_odom_frame: "odom"
+    publish_odom_tf: false
+    invert_odom_tf: false
+    data:
+      deskew: false
+      max_range: 3.5
+      min_range: 0.12
+    mapping:
+      voxel_size: 0.08
+      max_points_per_voxel: 20

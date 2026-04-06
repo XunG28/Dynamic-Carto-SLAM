@@ -1,0 +1,64 @@
+# Tuned EKF (v2): make the two odom sources complementary.
+# - Wheel odom (noisy) contributes only velocities (vx, vyaw).
+# - KISS-ICP contributes pose (x, y, yaw).
+# - IMU contributes only yaw rate (vyaw).
+#
+# This avoids "double integrating" wheel pose drift while still using wheel twist for smoothness.
+
+ekf_filter_node:
+  ros__parameters:
+    frequency: 30.0
+    sensor_timeout: 0.5
+    two_d_mode: true
+    transform_time_offset: 0.0
+    transform_timeout: 0.2
+    print_diagnostics: true
+    debug: false
+    publish_tf: false
+    publish_acceleration: false
+
+    map_frame: map
+    odom_frame: odom
+    base_link_frame: base_footprint
+    world_frame: odom
+
+    # Wheel slip / noisy wheel odom: ONLY twist (vx, vyaw).
+    odom0: /odom_noisy_carto
+    # Layout: [x, y, z, roll, pitch, yaw, vx, vy, vz, vroll, vpitch, vyaw, ax, ay, az]
+    odom0_config: [false, false, false,
+                   false, false, false,
+                   true,  false, false,
+                   false, false, true,
+                   false, false, false]
+    odom0_queue_size: 20
+    odom0_differential: false
+    odom0_relative: false
+    odom0_nodelay: true
+
+    # KISS-ICP: pose correction ONLY (x, y, yaw).
+    odom1: /kiss/odometry
+    odom1_config: [true, true, false,
+                   false, false, true,
+                   false, false, false,
+                   false, false, false,
+                   false, false, false]
+    odom1_queue_size: 10
+    odom1_differential: false
+    odom1_relative: false
+    odom1_nodelay: true
+
+    imu0: /imu
+    # Only yaw rate (wz). No absolute yaw / accel.
+    imu0_config: [false, false, false,
+                  false, false, false,
+                  false, false, false,
+                  false, false, true,
+                  false, false, false]
+    imu0_queue_size: 50
+    imu0_differential: false
+    imu0_relative: false
+    imu0_nodelay: true
+    imu0_remove_gravitational_acceleration: true
+
+    use_control: false
+
