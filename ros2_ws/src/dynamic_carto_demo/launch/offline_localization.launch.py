@@ -13,7 +13,15 @@ Usage:
     pbstream_in:=/path/map.pbstream \\
     bag_out:=/path/loc_out
 
+<<<<<<< HEAD
   If the input bag does not contain `/clock`: set `use_sim_time:=false`.
+=======
+  打滑 / 劣化里程计（bag 内需有 /odom_noisy）:
+    odom_topic:=/odom_noisy
+    （默认自动把 child_frame 改成 base_footprint、frame_id 改成 odom，供 Cartographer 与 bag 内 TF 一致）
+
+  无 /clock 的 bag: use_sim_time:=false
+>>>>>>> 8cad010 (feat(demo): add odom-noisy localization and fused KISS-ICP EKF pipeline)
 """
 
 import os
@@ -46,6 +54,61 @@ def launch_setup(context, *args, **kwargs):
     scan_topic = LaunchConfiguration('scan_topic').perform(context)
     odom_topic = LaunchConfiguration('odom_topic').perform(context)
     imu_topic = LaunchConfiguration('imu_topic').perform(context)
+    play_tf_mode = LaunchConfiguration('play_tf').perform(context).lower()
+
+    fix_arg = LaunchConfiguration('fix_odom_frames_for_cartographer').perform(context)
+    fa = fix_arg.lower()
+    if fa == 'auto':
+        use_odom_fix = odom_topic == '/odom_noisy'
+    elif fa in ('false', '0', 'no'):
+        use_odom_fix = False
+    else:
+        # true: only applies to noisy odom (standard /odom does not need rewriting)
+        use_odom_fix = odom_topic == '/odom_noisy'
+
+    # odom_noisy 默认 child_frame=base_footprint_noisy、frame_id=odom_noisy，与 bag 内 TF（odom->base_footprint）不一致
+    carto_odom_topic = '/odom_noisy_carto' if use_odom_fix else odom_topic
+
+    odom_fix_node = None
+    if use_odom_fix:
+        odom_fix_node = Node(
+            package='dynamic_carto_demo',
+            executable='odom_child_frame_fix',
+            name='odom_child_frame_fix',
+            output='screen',
+            parameters=[
+                {
+                    'use_sim_time': sim,
+                    'input_topic': odom_topic,
+                    'output_topic': carto_odom_topic,
+                    'frame_id': 'odom',
+                    'child_frame_id': 'base_footprint',
+                }
+            ],
+        )
+
+    # When feeding Cartographer with /odom_noisy (fixed to /odom_noisy_carto), we usually want TF
+    # to be consistent with that odometry, not with the bag-recorded true wheel TF. In that case,
+    # do not play /tf from bag; instead broadcast odom->base_footprint from the odometry topic.
+    if play_tf_mode == 'auto':
+        play_tf = not use_odom_fix
+    else:
+        play_tf = play_tf_mode in ('true', '1', 'yes')
+
+    odom_to_tf_node = None
+    if not play_tf:
+        odom_to_tf_node = Node(
+            package='dynamic_carto_demo',
+            executable='odom_to_tf',
+            name='odom_to_tf',
+            output='screen',
+            parameters=[
+                {
+                    'use_sim_time': sim,
+                    'input_topic': carto_odom_topic,
+                }
+            ],
+        )
 
     cartographer_node = Node(
         package='cartographer_ros',
@@ -60,7 +123,7 @@ def launch_setup(context, *args, **kwargs):
         ],
         remappings=[
             ('scan', scan_topic),
-            ('odom', odom_topic),
+            ('odom', carto_odom_topic),
             ('imu', imu_topic),
         ],
     )
@@ -80,11 +143,17 @@ def launch_setup(context, *args, **kwargs):
     ]
     if sim:
         record_cmd.append('--use-sim-time')
+    # 录制时同时保留干净 /odom、bag 里原始 odom 输入、以及 Cartographer 实际订阅的 topic
+    odom_record_topics = ['/odom']
+    if odom_topic not in odom_record_topics:
+        odom_record_topics.append(odom_topic)
+    if use_odom_fix and carto_odom_topic not in odom_record_topics:
+        odom_record_topics.append(carto_odom_topic)
+
     record_topics = [
         '/tf',
         '/tf_static',
         '/scan',
-        '/odom',
         '/imu',
         '/tracked_pose',
         '/eval/ground_truth/pose',
@@ -92,17 +161,22 @@ def launch_setup(context, *args, **kwargs):
     ]
     if sim:
         record_topics = ['/clock'] + record_topics
+    # insert odom topics after /scan for readability
+    idx = record_topics.index('/scan') + 1
+    for t in reversed(odom_record_topics):
+        record_topics.insert(idx, t)
     record_cmd.extend(record_topics)
 
     play_topics = [
-        '/tf',
         '/tf_static',
         '/scan',
-        '/odom',
+        odom_topic,
         '/imu',
         '/eval/ground_truth/pose',
         '/eval/ground_truth/odom',
     ]
+    if play_tf:
+        play_topics.insert(0, '/tf')
     if sim:
         play_topics = ['/clock'] + play_topics
 
@@ -120,13 +194,21 @@ def launch_setup(context, *args, **kwargs):
         )
     )
 
-    return [
-        cartographer_node,
-        occupancy_grid_node,
-        rosbag_record,
-        bag_play,
-        on_play_exit,
-    ]
+    nodes = []
+    if odom_fix_node is not None:
+        nodes.append(odom_fix_node)
+    if odom_to_tf_node is not None:
+        nodes.append(odom_to_tf_node)
+    nodes.extend(
+        [
+            cartographer_node,
+            occupancy_grid_node,
+            rosbag_record,
+            bag_play,
+            on_play_exit,
+        ]
+    )
+    return nodes
 
 
 def generate_launch_description():
@@ -153,7 +235,21 @@ def generate_launch_description():
                 default_value='tb3_warehouse_lds_2d_localization.lua',
             ),
             DeclareLaunchArgument('scan_topic', default_value='/scan'),
-            DeclareLaunchArgument('odom_topic', default_value='/odom'),
+            DeclareLaunchArgument(
+                'odom_topic',
+                default_value='/odom',
+                description='Cartographer odom input; use /odom_noisy for slip-injected wheel odom from bag.',
+            ),
+            DeclareLaunchArgument(
+                'fix_odom_frames_for_cartographer',
+                default_value='auto',
+                description='auto|true|false: rewrite odom frame_id/child_frame for Cartographer+TF (auto=on for /odom_noisy).',
+            ),
+            DeclareLaunchArgument(
+                'play_tf',
+                default_value='auto',
+                description='auto|true|false: play /tf from bag. auto=false for /odom_noisy (use odom_to_tf instead).',
+            ),
             DeclareLaunchArgument('imu_topic', default_value='/imu'),
             OpaqueFunction(function=launch_setup),
         ]
