@@ -34,3 +34,9 @@ source install/setup.bash
 
 See `experiments/static_v2/` for the current baseline/noisy/fused localization comparison template.
 
+### Results (static_v2)
+
+The current KPI snapshot is tracked in:
+
+- `experiments/static_v2/results.md`
+

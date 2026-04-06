@@ -22,3 +22,5 @@ Recommended practice:
 - Keep KPI tables in markdown (small text) tracked by git.
 - Keep large artifacts (`*.tum`, evo zips, plots) in `eval/` (ignored).
 
+See `results.md` for the current KPI snapshot.
+
