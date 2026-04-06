@@ -1,14 +1,14 @@
 # Copyright 2025
 # SPDX-License-Identifier: Apache-2.0
 """
-TB3 Waffle + industrial_warehouse_classic.world（AWS GAZEBO_MODEL_PATH + 官方 spawn_turtlebot3）。
+TB3 Waffle + industrial_warehouse_classic.world (AWS `GAZEBO_MODEL_PATH` + upstream TurtleBot3 spawn flow).
 
 Default spawn point is the same as the previous one when it can be displayed/controlled normally. If you want to move to another empty place, see the coordinates in Gazebo and then change x_pose/y_pose.
 
 Remote control (open another terminal):
   export TURTLEBOT3_MODEL=waffle
   source /opt/ros/humble/setup.bash
-  ros2 run turtlebot3_teleop teleop_keyboard（default model is waffle）
+  ros2 run turtlebot3_teleop teleop_keyboard (default model is waffle)
 """
 
 import os

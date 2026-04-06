@@ -3,9 +3,9 @@
 """
 Offline localization on a rosbag (no Gazebo).
 
-- baseline bag（ /clock when use_sim_time:=true），load pbstream，Cartographer pure localization output /tracked_pose。
-- 同时 ros2 bag record to new directory：/tracked_pose、sensors、GT、TF、/clock etc，均为仿真时间轴（录包加 --use-sim-time）。
-- bag playback ends, launch exits, recording ends.
+- Replay a baseline bag (with `/clock` when `use_sim_time:=true`), load a pbstream, and run Cartographer pure localization to output `/tracked_pose`.
+- In parallel, record a new rosbag2 directory containing `/tracked_pose`, sensors, ground truth, TF, and `/clock` (when sim time is used). Recording uses `--use-sim-time` so all messages share the bag time axis.
+- When bag playback ends, the launch shuts down and recording stops.
 
 Usage:
   ros2 launch dynamic_carto_demo offline_localization.launch.py \\
@@ -13,7 +13,7 @@ Usage:
     pbstream_in:=/path/map.pbstream \\
     bag_out:=/path/loc_out
 
-  无 /clock 的 bag: use_sim_time:=false
+  If the input bag does not contain `/clock`: set `use_sim_time:=false`.
 """
 
 import os

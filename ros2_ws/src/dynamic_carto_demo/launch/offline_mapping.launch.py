@@ -55,7 +55,7 @@ def generate_launch_description():
         parameters=[{'use_sim_time': True, 'resolution': 0.05}],
     )
 
-    # 若 bag 已含 /clock，勿再加 --clock，否则双时钟会导致 Cartographer 时间跳变。
+    # If the bag already contains `/clock`, do not add `--clock`, otherwise dual clocks may cause time jumps.
     bag_play = ExecuteProcess(
         cmd=['ros2', 'bag', 'play', bag],
         output='screen',
