@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<sdf version="1.6">
+  <model name="walking_person_proxy">
+    <!-- Use a static model to ensure ray sensors always collide with it.
+         The world plugin will still move it by SetWorldPose each tick. -->
+    <static>true</static>
+    <link name="link">
+      <collision name="collision">
+        <geometry>
+          <cylinder>
+            <radius>0.25</radius>
+            <length>1.70</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="visual">
+        <transparency>1.0</transparency>
+        <geometry>
+          <cylinder>
+            <radius>0.25</radius>
+            <length>1.70</length>
+          </cylinder>
+        </geometry>
+      </visual>
+    </link>
+  </model>
+</sdf>
+
